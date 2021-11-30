@@ -157,6 +157,7 @@ class Player(pygame.sprite.Sprite):
             self.health = self.health - 1
             health.image = health_ani[self.health]
             self.immune = True
+            print("You're hit")
 
             if self.health <= 0:
                 self.kill()
