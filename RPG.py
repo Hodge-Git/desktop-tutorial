@@ -1,10 +1,12 @@
 import pygame
 from pygame import rect
+from pygame import display
 from pygame.locals import *
 import sys
 import random
 from tkinter import filedialog
 from tkinter import *
+from pygame.time import set_timer
 
 from pygame.version import PygameVersion
 
@@ -35,6 +37,11 @@ attack_ani_R = [pygame.image.load("Pygame-RPG-materials/Player_Sprite_R.png"), p
 #Attack Left
 attack_ani_L = [pygame.image.load("Pygame-RPG-materials/Player_Sprite_L.png"), pygame.image.load("Pygame-RPG-materials/Player_Attack_L.png"), pygame.image.load("Pygame-RPG-materials/Player_Attack2_L.png"), pygame.image.load("Pygame-RPG-materials/Player_Attack2_L.png"), pygame.image.load("Pygame-RPG-materials/Player_Attack3_L.png"), pygame.image.load("Pygame-RPG-materials/Player_Attack3_L.png"), pygame.image.load("Pygame-RPG-materials/Player_Attack4_L.png"), pygame.image.load("Pygame-RPG-materials/Player_Attack4_L.png"), pygame.image.load("Pygame-RPG-materials/Player_Attack5_L.png"), pygame.image.load("Pygame-RPG-materials/Player_Attack5_L.png"), pygame.image.load("Pygame-RPG-materials/Player_Sprite_L.png")]
 
+#Health
+health_ani = [pygame.image.load("Pygame-RPG-materials/heart0.png"), pygame.image.load("Pygame-RPG-materials/heart.png"), pygame.image.load("Pygame-RPG-materials/heart2.png"), pygame.image.load("Pygame-RPG-materials/heart3.png"), pygame.image.load("Pygame-RPG-materials/heart4.png"), pygame.image.load("Pygame-RPG-materials/heart5.png")]
+
+hit_cooldown = pygame.USEREVENT + 1
+
 class Background(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
@@ -54,18 +61,80 @@ class Ground(pygame.sprite.Sprite):
     def render(self):
         displaysurface.blit(self.image, (self.rect.x, self.rect.y))
 
+class Castle(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.hide = False
+        self.image = pygame.image.load("Pygame-RPG-materials/castle.png")
+
+    def update(self):
+        if self.hide == False:
+            displaysurface.blit(self.image, (400, 80))
+
+class EventHandler():
+    def __init__(self):
+        self.enemy_count = 0
+        self.battle = False
+        self.enemy_generation = pygame.USEREVENT + 1
+        self.stage = 1
+        self.stage_enemies = []
+        for x in range(1, 21):
+            self.stage_enemies.append(int((x ** 2 / 2) + 1))
+
+    def next_stage(self): #Code for when the next stage is clicked
+        self.stage += 1
+        self.enemy_count = 0
+        print('Stage: ' + str(self.stage))
+        pygame.time.set_timer(self.enemy_generation, 1500 - (50 * self.stage))
+
+    def stage_handler(self):
+        #Code for the Tkinter stage selection window
+        self.root = Tk()
+        self.root.geometry('200x170')
+
+        button1 = Button(self.root, text = "Twilight Dungeon", width = 18, height = 2, command = self.world1)
+        button2 = Button(self.root, text = "Skyward Dungeon", width = 18, height = 2, command = self.world2)
+        button3 = Button(self.root, text = "Hell Dungeon", width = 18, height = 2, command = self.world3)
+
+        button1.place(x = 40, y = 15)
+        button2.place(x = 40, y = 65)
+        button3.place(x = 40, y = 115)
+
+        self.root.mainloop()
+
+
+    def world1(self):
+        self.root.destroy()
+        pygame.time.set_timer(self.enemy_generation, 2000)
+        castle.hide = True
+        self.battle = True
+
+    def world2(self):
+        self.battle = True
+        #Empty for now
+
+    def world3(self):
+        self.battle = True
+        #Empty for now
+
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
         self.image = pygame.image.load("Pygame-RPG-materials/Player_Sprite_R.png")
         self.rect = self.image.get_rect()
         self.jumping = False
+        
         #Movement
         self.running = False
         self.move_frame = 0
+        
         #Combat
         self.attacking = False
+        self.cooldown = False
         self.attack_frame = 0
+        self.health = 5
+        self.immune = False
+        self.last_collide_time = pygame.time.get_ticks()
 
         #Posistion and direction
         self.vx = 0
@@ -79,6 +148,20 @@ class Player(pygame.sprite.Sprite):
             self.attacking = True
         elif self.attacking == True:
             self.attacking = False
+
+    def player_hit(self):
+        if self.cooldown == False:
+            pygame.time.set_timer(hit_cooldown, 1000) #Resets cooldown in 1 second
+            self.cooldown == True #Enable the cooldown
+            
+            self.health = self.health - 1
+            health.image = health_ani[self.health]
+            self.immune = True
+
+            if self.health <= 0:
+                self.kill()
+                pygame.display.update()
+                print("You have died")
 
     def move(self):
         #Keep a constant acceleration of 0.5 in the downwards direction (gravity)
@@ -94,9 +177,9 @@ class Player(pygame.sprite.Sprite):
         pressed_keys = pygame.key.get_pressed()
 
         #Accelerates the player in the direction of the key press
-        if pressed_keys[K_LEFT]:
+        if pressed_keys[K_a]:
             self.acc.x = -ACC
-        if pressed_keys[K_RIGHT]:
+        if pressed_keys[K_d]:
             self.acc.x = ACC
 
         #Formulas to calculate velocity while accounting for friction
@@ -121,6 +204,10 @@ class Player(pygame.sprite.Sprite):
                     self.pos.y = lowest.rect.top + 1
                     self.vel.y = 0
                     self.jumping = False
+
+    def immunity(self):
+        if self.last_collide_time > pygame.time.get_ticks() - 3000:
+            self.immune = False
 
     def update(self):
         #Return to base frame is at end of movement sequence
@@ -181,6 +268,15 @@ class Player(pygame.sprite.Sprite):
       if self.attack_frame == 10:
             self.pos.x += 20
 
+class HealthBar(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.image.load("Pygame-RPG-materials/heart5.png")
+
+    def render(self):
+        displaysurface.blit(self.image, (10,10))
+
+
 class Enemy(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
@@ -214,20 +310,44 @@ class Enemy(pygame.sprite.Sprite):
         
         self.rect.center = self.pos #Updates rect
 
+    def update(self):
+        #Checks for collision with the Player
+        hits = pygame.sprite.spritecollide(self, Playergroup, False)
+
+        #Activates upon either of the two expressions being true
+        if hits and player.attacking == True:
+            self.kill()
+            print("Enemy killed")
+
+
+        #If collision has occured and player not attacking, call "hit" function
+        elif hits and player.attacking == False and player.immune == False:
+            player.player_hit()
+
+        elif hits and player.attacking == False and player.immune == True:
+            player.immunity()
+
     def render(self):
         #Displayed the enemy on screen
         displaysurface.blit(self.image, (self.pos.x, self.pos.y))
 
 
+Enemies = pygame.sprite.Group()
+
 background = Background()
 ground = Ground()
 player = Player()
+Playergroup = pygame.sprite.Group()
+Playergroup.add(player)
 enemy  = Enemy()
-
+castle = Castle()
+handler = EventHandler()
 ground = Ground()
 ground_group = pygame.sprite.Group()
 ground_group.add(ground)
+health = HealthBar()
 
+#Main game loop
 while True:
     player.gravity_check()
 
@@ -241,14 +361,30 @@ while True:
         if event.type == pygame.MOUSEBUTTONDOWN:
             pass
 
+        if event.type == handler.enemy_generation:
+            if handler.enemy_count < handler.stage_enemies[handler.stage - 1]:
+                enemy = Enemy()
+                Enemies.add(enemy)
+                handler.enemy_count += 1
+
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_n:
+                if handler.battle == True and len(Enemies) == 0:
+                    handler.next_stage()
+
         #event handling for a range of different key presses
         if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_e and 450 < player.rect.x < 550:
+                handler.stage_handler()
             if event.key == pygame.K_SPACE:
                 player.jump()
-            if event.key == pygame.K_RETURN:
+            if event.key == pygame.K_LSHIFT:
                 if player.attacking == False:
                     player.attack()
                     player.attack_update()
+        
+        if player.health > 0:
+            displaysurface.blit(player.image, player.rect)
 
     
     #Player related functions
@@ -256,15 +392,22 @@ while True:
     if player.attacking == True:
         player.attack()
     player.move()
+    for event in pygame.event.get():
+        if event.type == hit_cooldown:
+            player.cooldown = False
+            pygame.time.set_timer(hit_cooldown, 0)
 
     #Render Functions ----- 
     background.render()
     ground.render()
-    
+    health.render()
     #Rendering Sprites
+    castle.update()
     displaysurface.blit(player.image, player.rect)
-    enemy.render()
-    
+    for entity in Enemies:
+        entity.update()
+        entity.move()
+        entity.render()
 
     pygame.display.update()
     FPS_CLOCK.tick(FPS)
