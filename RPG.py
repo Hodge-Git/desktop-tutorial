@@ -22,6 +22,16 @@ FPS = 60
 FPS_CLOCK = pygame.time.Clock()
 COUNT = 0
 
+#Defining font styles
+headingfont = pygame.font.SysFont("Verdana", 40)
+regularfont = pygame.font.SysFont('Corbel', 25)
+smallerfont = pygame.font.SysFont('Corbel', 16)
+
+#color shades
+color_light = (170, 170, 170)
+color_dark = (100, 100, 100)
+color_white = (255, 255, 255)
+
 displaysurface = pygame.display.set_mode((WIDTH,HEIGHT))
 pygame.display.set_caption("Game")
 
@@ -51,6 +61,25 @@ class Background(pygame.sprite.Sprite):
 
     def render(self):
         displaysurface.blit(self.bgimage, (self.bgX, self.bgY))
+
+class StageDisplay(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.text = headingfont.render("STAGE: " + str(handler.stage), True, color_dark)
+        self.rect = self.text.get_rect()
+        self.posx = -100
+        self.posy = 100
+        self.display = False
+
+    def move_display(self):
+        #Create the text to be displayed
+        self.text = headingfont.render("STAGE: " + str(handler.stage), True, color_dark)
+        if self.posx < 700:
+            self.posx += 10
+            displaysurface.blit(self.text, (self.posx, self.posy))
+        else:
+            self.display = False
+            self.kill()
 
 class Ground(pygame.sprite.Sprite):
     def __init__(self):
@@ -133,7 +162,7 @@ class Player(pygame.sprite.Sprite):
         self.cooldown = False
         self.attack_frame = 0
         self.health = 5
-        self.immune = False
+        #self.immune = False
         self.last_collide_time = pygame.time.get_ticks()
 
         #Posistion and direction
@@ -156,7 +185,7 @@ class Player(pygame.sprite.Sprite):
             
             self.health = self.health - 1
             health.image = health_ani[self.health]
-            self.immune = True
+            #self.immune = True
             print("You're hit")
 
             if self.health <= 0:
@@ -206,9 +235,9 @@ class Player(pygame.sprite.Sprite):
                     self.vel.y = 0
                     self.jumping = False
 
-    def immunity(self):
-        if self.last_collide_time > pygame.time.get_ticks() - 3000:
-            self.immune = False
+    #def immunity(self):
+    #    if self.last_collide_time > pygame.time.get_ticks() - 3000:
+    #        self.immune = False
 
     def update(self):
         #Return to base frame is at end of movement sequence
@@ -322,11 +351,11 @@ class Enemy(pygame.sprite.Sprite):
 
 
         #If collision has occured and player not attacking, call "hit" function
-        elif hits and player.attacking == False and player.immune == False:
+        elif hits and player.attacking == False: #and player.immune == False:
             player.player_hit()
 
-        elif hits and player.attacking == False and player.immune == True:
-            player.immunity()
+        #elif hits and player.attacking == False and player.immune == True:
+        #    player.immunity()
 
     def render(self):
         #Displayed the enemy on screen
@@ -347,6 +376,7 @@ ground = Ground()
 ground_group = pygame.sprite.Group()
 ground_group.add(ground)
 health = HealthBar()
+stage_display = StageDisplay()
 
 #Main game loop
 while True:
@@ -372,6 +402,8 @@ while True:
             if event.key == pygame.K_n:
                 if handler.battle == True and len(Enemies) == 0:
                     handler.next_stage()
+                    stage_display = StageDisplay()
+                    stage_display.display = True
 
         #event handling for a range of different key presses
         if event.type == pygame.KEYDOWN:
@@ -409,6 +441,8 @@ while True:
         entity.update()
         entity.move()
         entity.render()
+    if stage_display.display == True:
+        stage_display.move_display()
 
     pygame.display.update()
     FPS_CLOCK.tick(FPS)
