@@ -162,6 +162,9 @@ class Player(pygame.sprite.Sprite):
         self.cooldown = False
         self.attack_frame = 0
         self.health = 5
+        self.experience = 0
+        self.mana = 0
+
         #self.immune = False
         self.last_collide_time = pygame.time.get_ticks()
 
@@ -306,6 +309,24 @@ class HealthBar(pygame.sprite.Sprite):
     def render(self):
         displaysurface.blit(self.image, (10,10))
 
+class StatusBar(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.surf = pygame.Surface((90,66))
+        self.rect = self.surf.get_rect(center = (500,10))
+
+    def update_draw(self):
+        #Create the text to be displayed
+        text1 = smallerfont.render("STAGE:  " + str(handler.stage), True, color_white)
+        text2 = smallerfont.render("EXP:  " + str(player.experience), True, color_white)
+        text3 = smallerfont.render("MANA:  " + str(player.mana), True, color_white)
+        text4 = smallerfont.render("FPS:  " + str(int(FPS_CLOCK.get_fps())), True, color_white)
+
+        #Draw the text to the satus bar
+        displaysurface.blit(text1, (585, 7))
+        displaysurface.blit(text2, (585, 22))
+        displaysurface.blit(text3, (585, 37))
+        displaysurface.blit(text4, (585, 52))
 
 class Enemy(pygame.sprite.Sprite):
     def __init__(self):
@@ -316,6 +337,8 @@ class Enemy(pygame.sprite.Sprite):
         self.vel = vec(0,0)
         self.direction = random.randint(0,1) #0 for Right, 1 for Left
         self.vel.x = random.randint(2,6) / 2 #Randomized velocity of the generated enmy
+        self.mana = random.randint(1,3) #Randomised mana amount obtained upon kill
+       
         #Sets the initial position of the enemy
         if self.direction == 0:
             self.pos.x = 100
@@ -346,6 +369,8 @@ class Enemy(pygame.sprite.Sprite):
 
         #Activates upon either of the two expressions being true
         if hits and player.attacking == True:
+            if player.mana < 100: player.mana += self.mana #Release mana
+            player.experience += 1 #Release experiance
             self.kill()
             print("Enemy killed")
 
@@ -377,6 +402,7 @@ ground_group = pygame.sprite.Group()
 ground_group.add(ground)
 health = HealthBar()
 stage_display = StageDisplay()
+status_bar = StatusBar()
 
 #Main game loop
 while True:
@@ -443,6 +469,9 @@ while True:
         entity.render()
     if stage_display.display == True:
         stage_display.move_display()
+    
+    displaysurface.blit(status_bar.surf,(580, 5))
+    status_bar.update_draw()
 
     pygame.display.update()
     FPS_CLOCK.tick(FPS)
