@@ -70,6 +70,7 @@ class StageDisplay(pygame.sprite.Sprite):
         self.posx = -100
         self.posy = 100
         self.display = False
+        self.clear = False
 
     def move_display(self):
         #Create the text to be displayed
@@ -80,6 +81,16 @@ class StageDisplay(pygame.sprite.Sprite):
         else:
             self.display = False
             self.kill()
+
+    def stage_clear(self):
+        self.text = headingfont.render("STAGE CLEAR!", True, color_dark)
+        if self.posx < 720:
+            self.posx += 5
+            displaysurface.blit(self.text, (self.posx, self.posy))
+        else:
+            self.display = False
+            self.posx = -100
+            self.posy = 100
 
 class Ground(pygame.sprite.Sprite):
     def __init__(self):
@@ -103,6 +114,7 @@ class Castle(pygame.sprite.Sprite):
 class EventHandler():
     def __init__(self):
         self.enemy_count = 0
+        self.enemy_dead_count = 0
         self.battle = False
         self.enemy_generation = pygame.USEREVENT + 1
         self.stage = 1
@@ -114,6 +126,7 @@ class EventHandler():
         self.stage += 1
         self.enemy_count = 0
         print('Stage: ' + str(self.stage))
+        self.enemy_dead_count = 0
         pygame.time.set_timer(self.enemy_generation, 1500 - (50 * self.stage))
 
     def stage_handler(self):
@@ -130,6 +143,12 @@ class EventHandler():
         button3.place(x = 40, y = 115)
 
         self.root.mainloop()
+
+    def update(self):
+        if self.enemy_dead_count == self.stage_enemies[self.stage - 1]:
+            self.enemy_dead_count = 0
+            stage_display.clear = True
+            stage_display.stage_clear()
 
 
     def world1(self):
@@ -183,8 +202,9 @@ class Player(pygame.sprite.Sprite):
 
     def player_hit(self):
         if self.cooldown == False:
+            self.cooldown = True #Enable the cooldown
             pygame.time.set_timer(hit_cooldown, 1000) #Resets cooldown in 1 second
-            self.cooldown == True #Enable the cooldown
+            
             
             self.health = self.health - 1
             health.image = health_ani[self.health]
@@ -372,6 +392,7 @@ class Enemy(pygame.sprite.Sprite):
             if player.mana < 100: player.mana += self.mana #Release mana
             player.experience += 1 #Release experiance
             self.kill()
+            handler.enemy_dead_count += 1
             print("Enemy killed")
 
 
@@ -409,6 +430,9 @@ while True:
     player.gravity_check()
 
     for event in pygame.event.get():
+        if event.type == hit_cooldown:
+            player.cooldown = False
+
         #Will run when the close window button is clicked
         if event.type == QUIT:
             pygame.quit()
@@ -451,10 +475,6 @@ while True:
     if player.attacking == True:
         player.attack()
     player.move()
-    for event in pygame.event.get():
-        if event.type == hit_cooldown:
-            player.cooldown = False
-            pygame.time.set_timer(hit_cooldown, 0)
 
     #Render Functions ----- 
     background.render()
@@ -469,9 +489,12 @@ while True:
         entity.render()
     if stage_display.display == True:
         stage_display.move_display()
+    if stage_display.clear == True:
+        stage_display.stage_clear()
     
     displaysurface.blit(status_bar.surf,(580, 5))
     status_bar.update_draw()
+    handler.update()
 
     pygame.display.update()
     FPS_CLOCK.tick(FPS)
