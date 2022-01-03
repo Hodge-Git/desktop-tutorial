@@ -1,13 +1,13 @@
-import pygame
-from pygame import rect
-from pygame import display
-from pygame.locals import *
-import sys
 import random
-from tkinter import filedialog
+import sys
 from tkinter import *
-from pygame.time import set_timer
+from tkinter import filedialog
 
+import numpy
+import pygame
+from pygame import display, rect
+from pygame.locals import *
+from pygame.time import set_timer
 from pygame.version import PygameVersion
 
 pygame.init() #Begin pygame
@@ -184,7 +184,6 @@ class Player(pygame.sprite.Sprite):
         self.experience = 0
         self.mana = 0
 
-        #self.immune = False
         self.last_collide_time = pygame.time.get_ticks()
 
         #Posistion and direction
@@ -208,7 +207,6 @@ class Player(pygame.sprite.Sprite):
             
             self.health = self.health - 1
             health.image = health_ani[self.health]
-            #self.immune = True
             print("You're hit")
 
             if self.health <= 0:
@@ -258,10 +256,6 @@ class Player(pygame.sprite.Sprite):
                     self.vel.y = 0
                     self.jumping = False
 
-    #def immunity(self):
-    #    if self.last_collide_time > pygame.time.get_ticks() - 3000:
-    #        self.immune = False
-
     def update(self):
         #Return to base frame is at end of movement sequence
         if self.move_frame > 6:
@@ -278,6 +272,7 @@ class Player(pygame.sprite.Sprite):
                 self.direction = "LEFT"
             self.move_frame += 1
 
+        #Returns to base frame if standing still and incorrect frame is showing
         if abs(self.vel.x) < 0.2 and self.move_frame != 0:
             self.move_frame = 0
             if self.direction == "RIGHT":
@@ -286,7 +281,7 @@ class Player(pygame.sprite.Sprite):
                 self.image = run_ani_L[self.move_frame]
 
     def attack(self):
-        #If attack frame has reached end of sequence, return to base
+        #If attack frame has reached end of sequence, return to base frame
         if self.attack_frame > 10:
             self.attack_frame = 0
             self.attacking = False
@@ -348,6 +343,36 @@ class StatusBar(pygame.sprite.Sprite):
         displaysurface.blit(text3, (585, 37))
         displaysurface.blit(text4, (585, 52))
 
+class Item(pygame.sprite.Sprite):
+    def __init__(self, itemtype):
+        super().__init__()
+        if itemtype == 1:
+            self.image = pygame.image.load("Pygame-RPG-materials/heart.png")
+        elif itemtype == 2:
+            self.image = pygame.image.load("Pygame-RPG-materials/coin.png")
+        self.rect = self.image.get_rect()
+        self.type = itemtype
+        self.posx = 0
+        self.posy = 9
+
+    def render(self):
+        self.rect.x = self.posx
+        self.rect.y = self.posy
+        displaysurface.blit(self.image, self.rect)
+
+    def update(self):
+        hits = pygame.sprite.spritecollide(self, Playergroup, False)
+        #Code to be activated if item comes in contact with the player
+        if hits:
+            if player.health < 5 and self.type == 1:
+                player.health += 1
+                health.image = health_ani[player.health]
+                self.kill()
+
+            if self.type == 2:
+                #handler.money += 1
+                self.kill()
+
 class Enemy(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
@@ -389,19 +414,31 @@ class Enemy(pygame.sprite.Sprite):
 
         #Activates upon either of the two expressions being true
         if hits and player.attacking == True:
+            self.kill()
             if player.mana < 100: player.mana += self.mana #Release mana
             player.experience += 1 #Release experiance
-            self.kill()
             handler.enemy_dead_count += 1
             print("Enemy killed")
 
+            rand_num = numpy.random.uniform(0,100)
+            item_no = 0
+            if rand_num >= 0 and rand_num <= 5: #1/20 chance for an item (health) drop
+                item_no = 1
+            elif rand_num > 5 and rand_num <= 15:
+                item_no = 2
+            
+            if item_no != 0:
+                #Add Item to Items group
+                item = Item(item_no)
+                Items.add(item)
+                #sets the item loaction to the location of the killed enemy
+                item.posx = self.pos.x
+                item.posy = self.pos.y
+
 
         #If collision has occured and player not attacking, call "hit" function
-        elif hits and player.attacking == False: #and player.immune == False:
+        elif hits and player.attacking == False:
             player.player_hit()
-
-        #elif hits and player.attacking == False and player.immune == True:
-        #    player.immunity()
 
     def render(self):
         #Displayed the enemy on screen
@@ -424,6 +461,7 @@ ground_group.add(ground)
 health = HealthBar()
 stage_display = StageDisplay()
 status_bar = StatusBar()
+Items = pygame.sprite.Group()
 
 #Main game loop
 while True:
@@ -495,6 +533,10 @@ while True:
     displaysurface.blit(status_bar.surf,(580, 5))
     status_bar.update_draw()
     handler.update()
+
+    for i in Items:
+        i.render()
+        i.update()
 
     pygame.display.update()
     FPS_CLOCK.tick(FPS)
