@@ -5,7 +5,9 @@ from tkinter import filedialog
 
 import numpy
 import pygame
-from pygame import display, rect
+from pygame import Cursor, display, rect
+from pygame import cursors
+from pygame import mouse
 from pygame.locals import *
 from pygame.time import set_timer
 from pygame.version import PygameVersion
@@ -62,6 +64,44 @@ class Background(pygame.sprite.Sprite):
     def render(self):
         displaysurface.blit(self.bgimage, (self.bgX, self.bgY))
 
+class PButton(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.vec = vec(620, 300)
+        self.imgdisp = 0
+
+    def render(self, num):
+        if (num == 0):
+            self.image = pygame.image.load("Pygame-RPG-materials/home_small.png")
+        elif (num == 1):
+            if cursor.wait == 0:
+                self.image = pygame.image.load("Pygame-RPG-materials/pause_small.png")
+            else:
+                self.image = pygame.image.load("Pygame-RPG-materials/play_small.png")
+
+        displaysurface.blit(self.image, self.vec)
+
+class Cursor(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.image.load("Pygame-RPG-materials/cursor.png")
+        self.rect = self.image.get_rect()
+        self.wait = 0
+
+    def pause(self):
+        if self.wait == 1:
+            self.wait = 0
+        else:
+            self.wait = 1
+
+    def hover(self):
+        if 620 <= mouse[0] <= 670 and 300 <= mouse[1] <= 345:
+            pygame.mouse.set_visible(False)
+            cursor.rect.center = pygame.mouse.get_pos() #update position
+            displaysurface.blit(cursor.image, cursor.rect)
+        else:
+            pygame.mouse.set_visible(True)      
+
 class StageDisplay(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
@@ -84,6 +124,7 @@ class StageDisplay(pygame.sprite.Sprite):
 
     def stage_clear(self):
         self.text = headingfont.render("STAGE CLEAR!", True, color_dark)
+        button.imgdisp = 0
         if self.posx < 720:
             self.posx += 5
             displaysurface.blit(self.text, (self.posx, self.posy))
@@ -123,6 +164,7 @@ class EventHandler():
             self.stage_enemies.append(int((x ** 2 / 2) + 1))
 
     def next_stage(self): #Code for when the next stage is clicked
+        button.imgdisp = 1
         self.stage += 1
         self.enemy_count = 0
         print('Stage: ' + str(self.stage))
@@ -154,16 +196,37 @@ class EventHandler():
     def world1(self):
         self.root.destroy()
         pygame.time.set_timer(self.enemy_generation, 2000)
+        button.imgdisp = 1
         castle.hide = True
         self.battle = True
 
     def world2(self):
         self.battle = True
+        button.imgdisp = 1
         #Empty for now
 
     def world3(self):
         self.battle = True
+        button.imgdisp = 1
         #Empty for now
+
+    def home(self):
+        #Reset Battle code
+        pygame.time.set_timer(self.enemy_generation, 0)
+        self.battle = False
+        self.enemy_count = 0
+        self.enemy_dead_count = 0
+        self.stage = 1
+
+        #Destroy any anemies or items laying around
+        for group in Enemies, Items:
+            for entity in group:
+                entity.kill()
+
+        #Bring back normal backgrounds
+        castle.hide = False
+        background.bgimage = pygame.image.load("Pygame-RPG-materials/Background.png")
+        ground.image = pygame.image.load("Pygame-RPG-materials/Ground.png")  
 
 class Player(pygame.sprite.Sprite):
     def __init__(self):
@@ -215,6 +278,7 @@ class Player(pygame.sprite.Sprite):
                 print("You have died")
 
     def move(self):
+        if cursor.wait == 1: return
         #Keep a constant acceleration of 0.5 in the downwards direction (gravity)
         self.acc = vec(0,0.5)
 
@@ -257,6 +321,7 @@ class Player(pygame.sprite.Sprite):
                     self.jumping = False
 
     def update(self):
+        if cursor.wait == 1: return
         #Return to base frame is at end of movement sequence
         if self.move_frame > 6:
             self.move_frame = 0
@@ -281,6 +346,7 @@ class Player(pygame.sprite.Sprite):
                 self.image = run_ani_L[self.move_frame]
 
     def attack(self):
+        if cursor.wait == 1: return
         #If attack frame has reached end of sequence, return to base frame
         if self.attack_frame > 10:
             self.attack_frame = 0
@@ -392,6 +458,8 @@ class Enemy(pygame.sprite.Sprite):
         self.pos.y = 235
 
     def move(self):
+        if cursor.wait == 1: return
+
         #Causes the enemy to change directions upon reaching the end of the screen
         if self.pos.x >= (WIDTH-20):
             self.direction = 1
@@ -450,6 +518,8 @@ Enemies = pygame.sprite.Group()
 background = Background()
 ground = Ground()
 player = Player()
+cursor = Cursor()
+button = PButton()
 Playergroup = pygame.sprite.Group()
 Playergroup.add(player)
 enemy  = Enemy()
@@ -466,6 +536,7 @@ Items = pygame.sprite.Group()
 #Main game loop
 while True:
     player.gravity_check()
+    mouse = pygame.mouse.get_pos()
 
     for event in pygame.event.get():
         if event.type == hit_cooldown:
@@ -478,7 +549,11 @@ while True:
 
         #For events that occur upon clicking the mouse (left click)
         if event.type == pygame.MOUSEBUTTONDOWN:
-            pass
+            if 620 <= mouse[0] <= 670 and 300 <= mouse[1] <= 345:
+                if button.imgdisp == 1:
+                    cursor.pause()
+                elif button.imgdisp == 0:
+                    handler.home()
 
         if event.type == handler.enemy_generation:
             if handler.enemy_count < handler.stage_enemies[handler.stage - 1]:
@@ -486,7 +561,7 @@ while True:
                 Enemies.add(enemy)
                 handler.enemy_count += 1
 
-        if event.type == pygame.KEYDOWN:
+        if event.type == pygame.KEYDOWN and cursor.wait == 0:
             if event.key == pygame.K_n:
                 if handler.battle == True and len(Enemies) == 0:
                     handler.next_stage()
@@ -518,6 +593,9 @@ while True:
     background.render()
     ground.render()
     health.render()
+    button.render(button.imgdisp)
+    cursor.hover()
+
     #Rendering Sprites
     castle.update()
     displaysurface.blit(player.image, player.rect)
