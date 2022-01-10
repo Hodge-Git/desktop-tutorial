@@ -245,6 +245,7 @@ class Player(pygame.sprite.Sprite):
         self.attack_frame = 0
         self.health = 5
         self.experience = 0
+        self.magic_cooldown = 1
         self.mana = 0
 
         self.last_collide_time = pygame.time.get_ticks()
@@ -382,6 +383,38 @@ class Player(pygame.sprite.Sprite):
       if self.attack_frame == 10:
             self.pos.x += 20
 
+class FireBall(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.direction = player.direction
+        if self.direction == "RIGHT":
+            self.image = pygame.image.load("Pygame-RPG-materials/fireball1_R.png")
+        else:
+            self.image = pygame.image.load("Pygame-RPG-materials/fireball1_L.png")
+        self.rect = self.image.get_rect(center = player.pos)
+        self.rect.x = player.pos.x
+        self.rect.y = player.pos.y -40
+
+    def fire(self):
+        player.magic_cooldown = 0
+        #Runs while the fireball is still within the screen w/ extra margin
+        if -10 < self.rect.x < 710:
+            if self.direction == "RIGHT":
+                self.image = pygame.image.load("Pygame-RPG-materials/fireball1_R.png")
+                displaysurface.blit(self.image, self.rect)
+            else:
+                self.image = pygame.image.load("Pygame-RPG-materials/fireball1_L.png")
+                displaysurface.blit(self.image, self.rect)
+            
+            if self.direction == "RIGHT":
+                self.rect.move_ip(12,0)
+            else:
+                self.rect.move_ip(-12,0)
+        else:
+            self.kill()
+            player.magic_cooldown = 1
+            player.attacking = False
+
 class HealthBar(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
@@ -471,17 +504,18 @@ class Enemy(pygame.sprite.Sprite):
             self.pos.x += self.vel.x
         if self.direction == 1:
             self.pos.x -= self.vel.x
-
-        
-        
+       
         self.rect.center = self.pos #Updates rect
 
     def update(self):
         #Checks for collision with the Player
         hits = pygame.sprite.spritecollide(self, Playergroup, False)
 
+        #Checks for collision with Fireballs
+        f_hits = pygame.sprite.spritecollide(self, Fireballs, False)
+
         #Activates upon either of the two expressions being true
-        if hits and player.attacking == True:
+        if hits and player.attacking == True or f_hits:
             self.kill()
             if player.mana < 100: player.mana += self.mana #Release mana
             player.experience += 1 #Release experiance
@@ -524,6 +558,7 @@ Playergroup = pygame.sprite.Group()
 Playergroup.add(player)
 enemy  = Enemy()
 castle = Castle()
+Fireballs = pygame.sprite.Group()
 handler = EventHandler()
 ground = Ground()
 ground_group = pygame.sprite.Group()
@@ -578,6 +613,12 @@ while True:
                 if player.attacking == False:
                     player.attack()
                     player.attack_update()
+            if event.key == pygame.K_f and player.magic_cooldown == 1:
+                if player.mana >= 6:
+                    player.mana -= 6
+                    player.attacking = True
+                    fireball = FireBall()
+                    Fireballs.add(fireball)
         
         if player.health > 0:
             displaysurface.blit(player.image, player.rect)
@@ -615,6 +656,9 @@ while True:
     for i in Items:
         i.render()
         i.update()
+    
+    for ball in Fireballs:
+        ball.fire()
 
     pygame.display.update()
     FPS_CLOCK.tick(FPS)
